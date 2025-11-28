@@ -1,6 +1,6 @@
 from typing_extensions import Annotated
 from typing import List, Optional
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, MappedAsDataclass
+from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, mapped_column, relationship
 from sqlalchemy import String, ForeignKey, Enum, DateTime
 import enum 
 from datetime import datetime, timezone
@@ -36,7 +36,7 @@ date_updated = Annotated[
 
 class Operator(Base):
     __tablename__ = "operators"
-    id: Mapped[int] = mapped_column(primary_key=True, init=False, name="pk_operators_id")
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
     name: Mapped[str50]
     max_loading: Mapped[int]
     current_leads: Mapped[int] = mapped_column(default=0)
@@ -60,11 +60,10 @@ class Operator(Base):
 
 class Lead(Base):
     __tablename__ = "leads"
-    id: Mapped[int] = mapped_column(primary_key=True, init=False, name="pk_leads_id")
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
     name: Mapped[str50]
     external_id: Mapped[str] = mapped_column(
         String(50), 
-        name="uq_leads_external_id", 
         unique=True, 
         doc="Идентификатор внешней системы"
     )
@@ -80,7 +79,7 @@ class Lead(Base):
 
 class Source(Base):
     __tablename__ = "sources"
-    id: Mapped[int] = mapped_column(primary_key=True, name="pk_sources_id", init=False)
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
     name: Mapped[str50]
     priorities: Mapped[List["OperatorSourcePriority"]] = relationship(
         back_populates="source",
@@ -100,11 +99,7 @@ class Source(Base):
 
 class OperatorSourcePriority(Base):
     __tablename__ = "operator_source_priorities"
-    id: Mapped[int] = mapped_column(
-        primary_key=True, 
-        name="pk_priorities_id", 
-        init=False
-    )
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
     operator_id: Mapped[int] = mapped_column(
         ForeignKey("operators.id"), 
         name="fk_priorities_operator_id"
@@ -122,11 +117,7 @@ class OperatorSourcePriority(Base):
 
 class Contact(Base):
     __tablename__ = "contacts"
-    id: Mapped[int] = mapped_column(
-        primary_key=True, 
-        name="pk_contacts_id", 
-        init=False
-    )
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
     operator_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("operators.id"), 
         name="fk_contacts_operator_id", 
@@ -150,3 +141,49 @@ class Contact(Base):
         default=StatusList.IN_QUEUE, 
         doc="Статус контакта"
     )
+    
+#  op.create_table('leads',
+    # sa.Column('id', sa.Integer(), nullable=False),
+    # sa.Column('name', sa.String(), nullable=False),
+    # sa.Column('external_id', sa.String(length=50), nullable=False),
+    # sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    # sa.PrimaryKeyConstraint('id', name="pk_leads_id"),
+    # sa.UniqueConstraint('external_id', name="uq_leads_external_id")
+    # )
+    # op.create_table('operators',
+    # sa.Column('id', sa.Integer(), nullable=False),
+    # sa.Column('name', sa.String(), nullable=False),
+    # sa.Column('max_loading', sa.Integer(), nullable=False),
+    # sa.Column('current_leads', sa.Integer(), nullable=False),
+    # sa.Column('active', sa.Boolean(), nullable=False),
+    # sa.PrimaryKeyConstraint('id', name="pk_operators_id")
+    # )
+    # op.create_table('sources',
+    # sa.Column('id', sa.Integer(), nullable=False),
+    # sa.Column('name', sa.String(), nullable=False),
+    # sa.PrimaryKeyConstraint('id', name="pk_sources_id")
+    # )
+    # op.create_table('contacts',
+    # sa.Column('id', sa.Integer(), nullable=False),
+    # sa.Column('operator_id', sa.Integer(), nullable=True),
+    # sa.Column('source_id', sa.Integer(), nullable=False),
+    # sa.Column('lead_id', sa.Integer(), nullable=False),
+    # sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    # sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    # sa.Column('status', sa.Enum('IN_QUEUE', 'NEW', 'IN_PROGRESS', 'DONE', name='contact_status'), nullable=False),
+    # sa.ForeignKeyConstraint(['lead_id'], ['leads.id'], name="fk_contacts_lead_id"),
+    # sa.ForeignKeyConstraint(['operator_id'], ['operators.id'], name="fk_contacts_operator_id"),
+    # sa.ForeignKeyConstraint(['source_id'], ['sources.id'], name="fk_contacts_source_id"),
+    # sa.PrimaryKeyConstraint('id', name="pk_contacts_id")
+    # )
+    # op.create_table('operator_source_priorities',
+    # sa.Column('id', sa.Integer(), nullable=False),
+    # sa.Column('operator_id', sa.Integer(), nullable=False),
+    # sa.Column('source_id', sa.Integer(), nullable=False),
+    # sa.Column('weight', sa.Integer(), nullable=False),
+    # sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    # sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    # sa.ForeignKeyConstraint(['operator_id'], ['operators.id'], name="fk_priorities_operator_id"),
+    # sa.ForeignKeyConstraint(['source_id'], ['sources.id'], name="fk_priorities_source_id"),
+    # sa.PrimaryKeyConstraint('id', name="pk_priorities_id")
+    # )
