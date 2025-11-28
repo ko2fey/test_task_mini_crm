@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 # ЗА ИНДЕКС УЗНАТь
 class StatusList(enum.Enum):
-    IN_QUENUE = "in_quenue"
+    IN_QUEUE = "in_queue"
     NEW = "new"
     IN_PROGRESS = "in_progress"
     DONE = "done"
@@ -16,10 +16,6 @@ class Base(MappedAsDataclass, DeclarativeBase):
     pass  
 
 str50 = Annotated[str, 50]
-pk = Annotated[int, mapped_column(primary_key=True)]
-op_fk = Annotated[int, mapped_column(ForeignKey("operators.id"))]
-src_fk = Annotated[int, mapped_column(ForeignKey("sources.id"))]
-lead_fk = Annotated[int, mapped_column(ForeignKey("leads.id"))]
 date_created = Annotated[
     datetime, 
     mapped_column(
@@ -40,7 +36,7 @@ date_updated = Annotated[
 
 class Operator(Base):
     __tablename__ = "operators"
-    id: Mapped[pk] = mapped_column(init=False)
+    id: Mapped[int] = mapped_column(primary_key=True, init=False, name="pk_operators_id")
     name: Mapped[str50]
     max_loading: Mapped[int]
     current_leads: Mapped[int] = mapped_column(default=0)
@@ -64,9 +60,14 @@ class Operator(Base):
 
 class Lead(Base):
     __tablename__ = "leads"
-    id: Mapped[pk] = mapped_column(init=False)
+    id: Mapped[int] = mapped_column(primary_key=True, init=False, name="pk_leads_id")
     name: Mapped[str50]
-    external_id: Mapped[str] = mapped_column(String(50), unique=True, doc="Идентификатор внешней системы")
+    external_id: Mapped[str] = mapped_column(
+        String(50), 
+        name="uq_leads_external_id", 
+        unique=True, 
+        doc="Идентификатор внешней системы"
+    )
     contacts: Mapped[List["Contact"]] = relationship(
         back_populates="lead",
         cascade="all, delete-orphan",
@@ -79,7 +80,7 @@ class Lead(Base):
 
 class Source(Base):
     __tablename__ = "sources"
-    id: Mapped[pk] = mapped_column(init=False)
+    id: Mapped[int] = mapped_column(primary_key=True, name="pk_sources_id", init=False)
     name: Mapped[str50]
     priorities: Mapped[List["OperatorSourcePriority"]] = relationship(
         back_populates="source",
@@ -99,9 +100,19 @@ class Source(Base):
 
 class OperatorSourcePriority(Base):
     __tablename__ = "operator_source_priorities"
-    id: Mapped[pk] = mapped_column(init=False)
-    operator_id: Mapped[op_fk]
-    source_id: Mapped[src_fk]
+    id: Mapped[int] = mapped_column(
+        primary_key=True, 
+        name="pk_priorities_id", 
+        init=False
+    )
+    operator_id: Mapped[int] = mapped_column(
+        ForeignKey("operators.id"), 
+        name="fk_priorities_operator_id"
+    )
+    source_id: Mapped[int] = mapped_column(
+        ForeignKey("sources.id"), 
+        name="fk_priorities_source_id"
+    )
     weight: Mapped[int]
     operator: Mapped["Operator"] = relationship(back_populates="priorities")
     source: Mapped["Source"] = relationship(back_populates="priorities")
@@ -111,13 +122,31 @@ class OperatorSourcePriority(Base):
 
 class Contact(Base):
     __tablename__ = "contacts"
-    id: Mapped[pk] = mapped_column(init=False)
-    operator_id: Mapped[Optional[op_fk]]
-    source_id: Mapped[src_fk]
-    lead_id: Mapped[lead_fk]
+    id: Mapped[int] = mapped_column(
+        primary_key=True, 
+        name="pk_contacts_id", 
+        init=False
+    )
+    operator_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("operators.id"), 
+        name="fk_contacts_operator_id", 
+        nullable=True
+    )
+    source_id: Mapped[int] = mapped_column(
+        ForeignKey("sources.id"), 
+        name="fk_contacts_source_id"
+    )
+    lead_id: Mapped[int] = mapped_column(
+        ForeignKey("leads.id"), 
+        name="fk_contacts_lead_id"
+    )
     lead: Mapped["Lead"] = relationship(back_populates="contacts")
     operator: Mapped[Optional["Operator"]] = relationship(back_populates="contacts")
     source: Mapped["Source"] = relationship(back_populates="contacts")
     created_at: Mapped[date_created]
     updated_at: Mapped[date_updated]
-    status: Mapped[StatusList] = mapped_column(Enum(StatusList), default=StatusList.IN_QUENUE, doc="Статус контакта")
+    status: Mapped[StatusList] = mapped_column(
+        Enum(StatusList, name="contact_status",), 
+        default=StatusList.IN_QUEUE, 
+        doc="Статус контакта"
+    )
