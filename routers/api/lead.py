@@ -1,9 +1,16 @@
 from schemas.schema_lead import ResponseLead, ResponseListLead, CreateLead, UpdateLead
 from schemas.schema_contact import ResponseListContact
-from fastapi import APIRouter, Depends, status
+from schemas.schema_source import ResponseListSource
+
 from models import Lead
+
 from services.service_lead import LeadService
+
 from dependencies import get_service_lead
+from dependencies import get_service_source
+
+from fastapi import APIRouter, Depends, status
+
 
 router = APIRouter(
     prefix="/leads",
@@ -66,3 +73,10 @@ async def get_contacts_by_lead(
     service: LeadService = Depends(get_service_lead)
 ):
     return service.get_contacts(id)
+
+@router.get("/{id}/sources", response_model=ResponseListSource)
+async def get_sources_by_lead(
+    id: int,
+    service: LeadService = Depends(get_service_lead)
+):
+    return service.get_sources(id)

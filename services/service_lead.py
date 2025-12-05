@@ -13,3 +13,12 @@ class LeadService:
             'total_count': len(contacts)
         }
         return response
+
+    def get_sources(self, id: int):
+        sources = self.repo.get_list_sources(id)
+        response = {
+            'objects': sources,
+            'total_count': len(sources)
+        }
+        print(response)
+        return response
