@@ -16,6 +16,7 @@ class CreateContact(BaseContact):
 
 class UpdateContact(BaseModel):
     status: StatusList
+    operator_id: Optional[int] = None
 
 class ResponseContact(BaseContact):
     id: int

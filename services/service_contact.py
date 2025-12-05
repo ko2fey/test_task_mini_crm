@@ -65,9 +65,11 @@ class DistributeService:
             if new_contact and operator:
                 operator.increment_current_loading()
                 self.repo_operator.save()
+                
             return new_contact
         
         except Exception as e:
+            self.repo_distribute.db.rollback()
             raise UnexpectedException(
                 status_code=500,
                 detail=f"Unexpected Error in Service Contact: {e}"
