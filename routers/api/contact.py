@@ -30,7 +30,7 @@ async def create_contact(
     data: AssignLead,
     service: DistributeService = Depends(get_service_distribute)
 ) -> Contact:
-    return service.distrebute_lead(data)
+    return service.distribute_lead(data)
 
 @router.put("/{id}", response_model=ResponseContact)
 async def update_operator(

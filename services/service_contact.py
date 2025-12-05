@@ -7,6 +7,7 @@ from repositories.repo_lead import LeadRepository
 
 from models import Contact, Operator
 from custom_enum import StatusList
+from exceptions.exc_service import UnexpectedException
 from typing import List, Dict, Any, Optional
 
 
@@ -23,46 +24,54 @@ class DistributeService:
         self.repo_lead = lead_repository
         self.repo_distribute = distribute_repository
     
-    def distrebute_lead(self, data: AssignLead) -> Contact:
-        # Find or create lead
-        lead = self.repo_lead.find_by_external_id(data.external_id)
-        
-        if lead is None:
-            lead = self.repo_lead.create(
-                CreateLead(
-                    **data.model_dump(
-                        exclude_none=True, 
-                        exclude_unset=True, 
-                        exclude={"source_id"}
+    def distribute_lead(self, data: AssignLead) -> Contact:
+        try:
+            # Find or create lead
+            lead = self.repo_lead.find_by_external_id(data.external_id)
+            
+            if lead is None:
+                lead = self.repo_lead.create(
+                    CreateLead(
+                        **data.model_dump(
+                            exclude_none=True, 
+                            exclude_unset=True, 
+                            exclude={"source_id"}
+                        )
                     )
                 )
-            )
-        
-        # Get source and add to lead. For model LeadsSources
-        source = self.repo_source.get(data.source_id)
-        lead.sources.append(source)
-        # Select best availeble operator
-        operator = self.select_best_operator(data.source_id)
-        
-        contact_data: Dict[str, Any] = {
-            "lead_id": lead.id,
-            "source_id": data.source_id
-        }
-        
-        if operator:
-            contact_data.update(
-                {
-                    "operator_id": operator.id, 
-                    "status": StatusList.NEW
-                }
-            )
+            
+            # Get source and add to lead. For model LeadsSources
+            # SQLALchemy auto prevent add duplicate for relationship fields
+            source = self.repo_source.get(data.source_id)
+            lead.sources.append(source)
+            # Select best availeble operator
+            operator = self.select_best_operator(data.source_id)
+            
+            contact_data: Dict[str, Any] = {
+                "lead_id": lead.id,
+                "source_id": data.source_id
+            }
+            
+            if operator:
+                contact_data.update(
+                    {
+                        "operator_id": operator.id, 
+                        "status": StatusList.NEW
+                    }
+                )
 
-        # Create contact with operator or not  
-        new_contact = self.repo_distribute.create(CreateContact(**contact_data))
-        if new_contact and operator:
-            operator.increment_current_loading()
-            self.repo_operator.save()
-        return new_contact
+            # Create contact with operator or not  
+            new_contact = self.repo_distribute.create(CreateContact(**contact_data))
+            if new_contact and operator:
+                operator.increment_current_loading()
+                self.repo_operator.save()
+            return new_contact
+        
+        except Exception as e:
+            raise UnexpectedException(
+                status_code=500,
+                detail=f"Unexpected Error in Service Contact: {e}"
+            ) from e
     
     def select_best_operator(self, source_id: int) -> Optional[Operator]:
         try:    
