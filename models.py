@@ -1,16 +1,14 @@
 from typing_extensions import Annotated
-from typing import List, Optional
-from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, mapped_column, relationship
+from typing import List, Optional, cast
+from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass 
+from sqlalchemy.orm import mapped_column, relationship, validates
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy import String, ForeignKey, Enum, DateTime
-import enum 
 from datetime import datetime, timezone
+from custom_enum import StatusList
 
 # ЗА ИНДЕКС УЗНАТь
-class StatusList(enum.Enum):
-    IN_QUEUE = "in_queue"
-    NEW = "new"
-    IN_PROGRESS = "in_progress"
-    DONE = "done"
 
 class Base(MappedAsDataclass, DeclarativeBase):
     pass  
@@ -39,7 +37,7 @@ class Operator(Base):
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     name: Mapped[str50]
     max_loading: Mapped[int]
-    current_leads: Mapped[int] = mapped_column(default=0)
+    current_loading: Mapped[int] = mapped_column(default=0)
     active: Mapped[bool] = mapped_column(default=True)
     priorities: Mapped[List["OperatorSourcePriority"]] = relationship(
         back_populates="operator",
@@ -57,26 +55,109 @@ class Operator(Base):
         doc="Контакты назначенные оператору",
         default_factory=list
     )
-
+    
+    @hybrid_property 
+    def is_active(self) -> bool:
+        return self.active
+    
+    @is_active.expression
+    def is_active_expr(cls) -> ColumnElement[bool]:
+        return cast(ColumnElement[bool], cls.active)
+    
+    @hybrid_property
+    def is_available(self) -> bool:
+        return self.current_loading < self.max_loading
+    
+    @is_available.expression
+    def is_available_expr(self) -> ColumnElement[bool]:
+        return cast(ColumnElement[bool], self.current_loading < self.max_loading)
+    
+    def activate(self):
+        self.active = True
+    
+    def deactivate(self):
+        self.active = False
+    
+    def can_delete(self) -> bool:
+        active_statuses = (StatusList.IN_PROGRESS, StatusList.NEW)
+        has_active_contact = any(
+            contact.status in active_statuses 
+            for contact in self.contacts
+        )
+        return not has_active_contact
+    
+    def get_priority_source(self, source_id: int) -> Optional[int]:
+        return next(
+            (
+                priority.weight 
+                for priority in self.priorities 
+                if priority.source_id == source_id
+            ), 
+            None
+        )
+    
+    def increment_current_loading(self):
+        self.current_loading += 1
+    
+    def decrement_current_loading(self):
+        self.current_loading -= 1
+    
+    @validates("max_loading")
+    def validate_max_loading(self, key, max_loading):
+        print("Hello stas")
+        print(max_loading)
+        print(self.current_loading)
+        print(type(self.current_loading))
+        if max_loading <= 0:
+            raise ValueError("max_loading must be greater than 0")
+        
+        if self.current_loading is not None and max_loading < self.current_loading:
+            raise ValueError("max_loading must be greater than current loading")
+        return max_loading
+    
+    @validates("current_loading")
+    def validate_current_loading(self, key, current_loading):
+        if current_loading < 0:
+            raise ValueError("current_loading can't be less than 0")
+        
+        if self.max_loading is not None and current_loading > self.max_loading:
+            raise ValueError("current_loading must be less than max loading")
+        return current_loading
+    
+    def __repr__(self):
+        return f"Operator(id={self.id}, name='{self.name}', loading={self.current_loading}/{self.max_loading})"
+    
 class Lead(Base):
     __tablename__ = "leads"
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
-    name: Mapped[str50]
     external_id: Mapped[str] = mapped_column(
         String(50), 
         unique=True, 
         doc="Идентификатор внешней системы"
     )
+    created_at: Mapped[date_created] = mapped_column(init=False)
+    name: Mapped[str50] = mapped_column(nullable=True, default=None)
     contacts: Mapped[List["Contact"]] = relationship(
         back_populates="lead",
         cascade="all, delete-orphan",
         order_by="Contact.created_at",
         lazy="selectin",
-        doc="Контакты связанные с лидом"
+        doc="Контакты связанные с лидом",
+        default_factory=list,
     )
-    created_at: Mapped[date_created]
-
-
+    sources: Mapped[List["Source"]] = relationship(
+        back_populates="leads",
+        secondary="leads_sources",
+        order_by="LeadsSources.created_at",
+        lazy="selectin",
+        doc="Источники связанные с лидом",
+        default_factory=list,
+    )
+    
+    def __repr__(self):
+        return f"Lead(id={self.id}, external_id='{self.external_id}')"
+    
+    
 class Source(Base):
     __tablename__ = "sources"
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
@@ -86,18 +167,58 @@ class Source(Base):
         cascade="all, delete-orphan",
         order_by="OperatorSourcePriority.weight",
         lazy="selectin",
-        doc="Приоритеты источника"
+        doc="Приоритеты источника",
+        default_factory=list
     )
     contacts: Mapped[List["Contact"]] = relationship(
         back_populates="source",
         cascade="all, delete-orphan",
         order_by="Contact.created_at",
         lazy="selectin",
-        doc="Контакты связанные с источником"
+        doc="Контакты связанные с источником",
+        default_factory=list
+    )
+    leads: Mapped[List["Lead"]] = relationship(
+        back_populates="sources",
+        secondary="leads_sources",
+        order_by="LeadsSources.created_at",
+        lazy="selectin",
+        doc="Лиды связанные с источником",
+        default_factory=list
     )
     
+    def can_delete(self) -> bool:
+        active_statuses = (StatusList.IN_PROGRESS, StatusList.NEW)
+        has_active_contact = any(
+            contact.status in active_statuses 
+            for contact in self.contacts
+        )
+        return not has_active_contact
+    
+    def __repr__(self):
+        return f"Source(id={self.id}, name='{self.name}')"
 
+class LeadsSources(Base):
+    __tablename__ = "leads_sources"
+    lead_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "leads.id",
+            name="fk_leads_sources_lead_id"
+        ),
+        primary_key=True
+    )
+    source_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "sources.id",
+            name="fk_leads_sources_source_id"
+        ),
+        primary_key=True 
+    )
+    created_at: Mapped[date_created] = mapped_column(init=False)
+    
+    
 class OperatorSourcePriority(Base):
+    # operator_id + source_id должны быть уникальны в рамках таблицы
     __tablename__ = "operator_source_priorities"
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     operator_id: Mapped[int] = mapped_column(
@@ -113,11 +234,14 @@ class OperatorSourcePriority(Base):
         ) 
     )
     weight: Mapped[int]
-    operator: Mapped["Operator"] = relationship(back_populates="priorities")
-    source: Mapped["Source"] = relationship(back_populates="priorities")
-    created_at: Mapped[date_created]
-    updated_at: Mapped[date_updated]
-
+    operator: Mapped["Operator"] = relationship(back_populates="priorities", init=False)
+    source: Mapped["Source"] = relationship(back_populates="priorities", init=False)
+    created_at: Mapped[date_created] =  mapped_column(init=False)
+    updated_at: Mapped[date_updated] =  mapped_column(init=False)
+    
+    def __repr__(self):
+        return f"OperatorSourcePriority(id={self.id}, operator_id='{self.operator_id}', \
+               "f"source_id='{self.source_id}', weight='{self.weight}')"
 
 class Contact(Base):
     __tablename__ = "contacts"
@@ -141,13 +265,17 @@ class Contact(Base):
             name="fk_contacts_lead_id"
         ) 
     )
-    lead: Mapped["Lead"] = relationship(back_populates="contacts")
-    operator: Mapped[Optional["Operator"]] = relationship(back_populates="contacts")
-    source: Mapped["Source"] = relationship(back_populates="contacts")
-    created_at: Mapped[date_created]
-    updated_at: Mapped[date_updated]
+    lead: Mapped["Lead"] = relationship(back_populates="contacts", init=False)
+    operator: Mapped[Optional["Operator"]] = relationship(back_populates="contacts", init=False)
+    source: Mapped["Source"] = relationship(back_populates="contacts", init=False)
+    created_at: Mapped[date_created] = mapped_column(init=False)
+    updated_at: Mapped[date_updated] = mapped_column(init=False)
     status: Mapped[StatusList] = mapped_column(
-        Enum(StatusList, name="contact_status",), 
-        default=StatusList.IN_QUEUE, 
+        Enum(StatusList, name="contact_status"),
+        default=StatusList.IN_QUEUE,
         doc="Статус контакта"
     )
+    
+    def __repr__(self):
+        return f"Contact(id={self.id}, operator_id='{self.operator_id}', source_id='{self.source_id}', " \
+               f"lead_id='{self.lead_id}', status='{self.status}', created_at='{self.created_at}')"
