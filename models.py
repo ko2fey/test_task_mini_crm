@@ -1,12 +1,13 @@
 from typing_extensions import Annotated
 from typing import List, Optional, cast
-from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass 
+from sqlalchemy.orm import DeclarativeBase, Mapped
+from sqlalchemy.orm import MappedAsDataclass
 from sqlalchemy.orm import mapped_column, relationship, validates
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy import String, ForeignKey, Enum, DateTime
 from datetime import datetime, timezone
-from custom_enum import StatusList
+from dependencies.custom_enum import StatusList
 
 # ЗА ИНДЕКС УЗНАТь
 
@@ -162,14 +163,6 @@ class Source(Base):
     __tablename__ = "sources"
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     name: Mapped[str50]
-    priorities: Mapped[List["OperatorSourcePriority"]] = relationship(
-        back_populates="source",
-        cascade="all, delete-orphan",
-        order_by="OperatorSourcePriority.weight",
-        lazy="selectin",
-        doc="Приоритеты источника",
-        default_factory=list
-    )
     contacts: Mapped[List["Contact"]] = relationship(
         back_populates="source",
         cascade="all, delete-orphan",
@@ -184,6 +177,14 @@ class Source(Base):
         order_by="LeadsSources.created_at",
         lazy="selectin",
         doc="Лиды связанные с источником",
+        default_factory=list
+    )
+    priorities: Mapped[List["OperatorSourcePriority"]] = relationship(
+        back_populates="source",
+        cascade="all, delete-orphan",
+        order_by="OperatorSourcePriority.weight",
+        lazy="selectin",
+        doc="Приоритеты источника",
         default_factory=list
     )
     
