@@ -1,14 +1,24 @@
-from schemas.schema_base import SortParams, PaginationParams
-from typing import TypeVar, Generic, Type, List, Dict, Optional, Callable
-from pydantic import BaseModel
+from typing import TypeVar, Generic, Type, Optional, Callable, Dict, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from schemas.schema_base import SortParams, PaginationParams
+    from pydantic import BaseModel
+    from sqlalchemy.orm import Session
+    from sqlalchemy.orm.query import Query
+    from dependencies.typed_dict import DictResponseList
+
+from models import Base
+        
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
-from sqlalchemy.orm.query import Query
-from exceptions.exc_base import NotFoundException, FailedUpdateException
-from exceptions.exc_base import ForbiddenDeleteException, DatabaseException
+from exceptions.exc_base import NotFoundException
+from exceptions.exc_base import FailedUpdateException
+from exceptions.exc_base import DatabaseException
 from exceptions.exc_base import UnexpectedException
 
-ModelType = TypeVar("ModelType")
+
+
+ModelType = TypeVar("ModelType", bound=Base)
+RelatedType = TypeVar("RelatedType", bound=Base)
 
 class BaseRepository(Generic[ModelType]):
     def __init__(self, model: Type[ModelType], db: Session):
@@ -18,29 +28,30 @@ class BaseRepository(Generic[ModelType]):
     def _apply_sort(
         self, 
         sort: SortParams, 
-        query: Query, 
-        response:Dict[str, int | List[ModelType] | str]
-    ) -> Query:
-        column = getattr(self.model, sort.order_by)
-        query = query.order_by(
-            column.asc() if sort.order_type == 'asc' else column.desc()
-        )
-        
-        response.update(
-            {
-                'order_type': sort.order_type,
-                'order_by': sort.order_by,   
-            }
-        )
+        query: Query[RelatedType], 
+        response: DictResponseList[RelatedType]
+    ) -> Query[RelatedType]:
+        if hasattr(self.model, sort.order_by):
+            column = getattr(self.model, sort.order_by)
+            query = query.order_by(
+                column.asc() if sort.order_type == 'asc' else column.desc()
+            )
+            
+            response.update(
+                {
+                    'order_type': sort.order_type,
+                    'order_by': sort.order_by,   
+                }
+            )
             
         return query
     
     def _apply_pagination(
         self, 
         pagination: PaginationParams, 
-        query: Query, 
-        response:Dict[str, int | List[ModelType] | str]
-    ) -> Query:
+        query: Query[RelatedType], 
+        response: DictResponseList[RelatedType]
+    ) -> Query[RelatedType]:
         query = query \
             .offset((pagination.page - 1) * pagination.limit) \
             .limit(pagination.limit)
@@ -54,38 +65,35 @@ class BaseRepository(Generic[ModelType]):
             
         return query
     
-    # ФИЛЬТ ВООБЩЕ НАДО ПОДУМАТЬ КАК ЕГО СДЕЛАТЬ ЛУЧШЕ
     def _apply_filter(
         self, 
         filter_params: BaseModel, 
-        query: Query, 
-        response:Dict[str, int | List[ModelType] | str]
+        query: Query
     ) -> Query:
         cleaned_filter = filter_params \
             .model_dump(exclude_none=True, exclude_unset=True) \
             .items()
         for key, value in cleaned_filter:
             query = query.filter(getattr(self.model, key) == value)    
-            
+        
         return query
-     
+
     def get_list(self, 
         pagination: Optional[PaginationParams] = None,
         filter_params: Optional[BaseModel] = None,
         sort: Optional[SortParams] = None,
-    ) -> Dict[str, int | List[ModelType] | str]:
+    ) -> DictResponseList[ModelType]:
         try:
             query = self.db.query(self.model)
-            response = {}
+            response: DictResponseList[ModelType] = {}
             
             if filter_params:
                 query = self._apply_filter(
                     filter_params=filter_params, 
                     query=query, 
-                    response=response
                 )
             
-            total_count = query.count()     
+            total_count = query.count()    
                 
             if sort:    
                 query = self._apply_sort(sort=sort, query=query, response=response)   
@@ -99,7 +107,7 @@ class BaseRepository(Generic[ModelType]):
                     'total_count': total_count,
                 }
             )
-                
+            
             return response
         
         except SQLAlchemyError as e:
@@ -113,10 +121,10 @@ class BaseRepository(Generic[ModelType]):
                 status_code=500, 
                 detail=f"Unexpected Error: {str(e)}"
             ) from e
-     
-    def create(self, data: BaseModel) -> ModelType:
-        try:     
-            new_object = self.model(**data.model_dump(exclude_none=True, exclude_unset=True))
+
+    def create(self, object: Dict[str, Any]) -> ModelType:
+        try:
+            new_object = self.model(**object)     
             self.db.add(new_object)
             self.save()
             self.db.refresh(new_object)
@@ -130,26 +138,22 @@ class BaseRepository(Generic[ModelType]):
                        f"Failed to create object: {e}",
             ) from e
         
-        # except Exception as e:
-        #     raise UnexpectedException(
-        #         status_code=500, 
-        #         detail=f"Unexpected Error\n"
-        #                f"Failed to create object: {e}"
-        #     ) from e
+        except Exception as e:
+            raise UnexpectedException(
+                status_code=500, 
+                detail=f"Unexpected Error\n"
+                       f"Failed to create object: {e}"
+            ) from e
         
     def update(
         self,
         id: int,
-        data: BaseModel
+        data: Dict[str, Any],
     ) -> ModelType:
         try:
             object = self.get(id)   
-            update_data = data.model_dump(
-                exclude_none=True, 
-                exclude_unset=True
-            )
                     
-            for key, value in update_data.items():
+            for key, value in data.items():
                 setattr(object, key, value)
             
             self.save()

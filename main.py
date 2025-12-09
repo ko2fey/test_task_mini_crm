@@ -1,14 +1,18 @@
 import fastapi
-from routers.api import operator, lead, priority, source, contact
+
+from routers.api.operator import router as router_operator
+from routers.api.source import router as router_source
+from routers.api.contact import router as router_contact
+from routers.api.lead import router as router_lead
+from routers.api.priority import router as router_priority
 
 app = fastapi.FastAPI()
 
-
-app.include_router(operator.router)
-app.include_router(lead.router)
-app.include_router(priority.router)
-app.include_router(source.router)
-app.include_router(contact.router)
+app.include_router(router_operator)
+app.include_router(router_source)
+app.include_router(router_contact)
+app.include_router(router_lead)
+app.include_router(router_priority)
 
 if __name__ == "__main__":
     import uvicorn
