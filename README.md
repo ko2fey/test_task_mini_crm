@@ -1,4 +1,4 @@
-# Выполнение тестового задания, по создания CRM   
+# Выполнение тестового задания, по созданию CRM   
 
 [![Python](https://img.shields.io/badge/Python-3.14-blue.svg)](https://python.org)
 
@@ -40,7 +40,7 @@ pip install -r requirements.txt
 mkdir alembic/versions
 ```
 
-### 7. Запустить alembic он создаст миграции для базы данных
+### 7. Запустить alembic, он создаст миграции для базы данных
 ```bash
 alembic revision --autogenerate
 ```
