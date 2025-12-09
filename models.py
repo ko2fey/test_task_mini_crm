@@ -1,5 +1,6 @@
 from typing_extensions import Annotated
 from typing import List, Optional, cast
+from sqlalchemy import Index, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped
 from sqlalchemy.orm import MappedAsDataclass
 from sqlalchemy.orm import mapped_column, relationship, validates
@@ -125,6 +126,10 @@ class Operator(Base):
             raise ValueError("current_loading must be less than max loading")
         return current_loading
     
+    __table_args__ = (
+        Index("ix_operator_active", "active")
+    )
+    
     def __repr__(self):
         return f"Operator(id={self.id}, name='{self.name}', loading={self.current_loading}/{self.max_loading})"
     
@@ -243,6 +248,15 @@ class OperatorSourcePriority(Base):
     def __repr__(self):
         return f"OperatorSourcePriority(id={self.id}, operator_id='{self.operator_id}', \
                "f"source_id='{self.source_id}', weight='{self.weight}')"
+    
+    __table_args__ = (
+        UniqueConstraint(
+            "operator_id", 
+            "source_id", 
+            name="uq_operator_source"
+        ),
+        Index("ix_operator_source_priority_operator_id", "operator_id")
+    )
 
 class Contact(Base):
     __tablename__ = "contacts"
@@ -275,6 +289,12 @@ class Contact(Base):
         Enum(StatusList, name="contact_status"),
         default=StatusList.IN_QUEUE,
         doc="Статус контакта"
+    )
+    
+    __table_args__ = (
+        Index("ix_contact_operator_id", "operator_id"),
+        Index("ix_contact_created_at", "created_at"),
+        Index("ix_contact_status", "status")
     )
     
     def __repr__(self):
