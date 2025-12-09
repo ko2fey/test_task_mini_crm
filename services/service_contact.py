@@ -14,6 +14,7 @@ from services.service_base import BaseService
 
 from dependencies.custom_enum import StatusList
 from exceptions.exc_service import UnexpectedException
+from exceptions.exc_base import RepositoryException
     
 
 
@@ -29,6 +30,39 @@ class DistributeService(BaseService[DistributeRepository, Contact]):
         self.repo_source = source_repository
         self.repo_operator = operator_repository
         self.repo_lead = lead_repository 
+    
+    def update(self, id: int, data: Dict[str, Any]) -> Contact:
+        if data.get('status', None):
+            contact = self.repo.get(id)
+            
+            if data['status'] == StatusList.DONE:
+                
+                if contact.operator_id:
+                    operator = self.repo_operator.get(contact.operator_id)
+                    operator.decrement_current_loading()
+                    self.repo.save()
+            
+                    
+        return self.repo.update(id, data)
+    
+    def delete(self, object: Contact) -> None:
+        try:
+            if  object.operator_id:
+                operator = self.repo_operator.get(object.operator_id)
+                operator.decrement_current_loading()
+                
+            self.repo.delete(object)
+            self.repo.save()
+            
+        except RepositoryException as e:
+            self.repo.db.rollback()
+            raise
+        except Exception as e:
+            self.repo.db.rollback()
+            raise UnexpectedException(
+                status_code=500,
+                detail=f"Unexpected Error in Service Contact: {e}"
+            ) from e
     
     def distribute_lead(self, data: Dict[str, Any]) -> Contact:
         try:
@@ -91,8 +125,7 @@ class DistributeService(BaseService[DistributeRepository, Contact]):
                 
                 coef = weight / max(operator.current_loading, 1)
                 coefficients.append((operator, coef))
-                
-                # print(f'Operator: {operator.id}, weight: {weight}, coef: {coef}')              
+                            
             coefficients.sort(key=lambda x: (-x[1], x[0].current_loading))  
             
             print(f'Result: operator:{coefficients[0][0].id}, coef: {coefficients[0][1]}')
