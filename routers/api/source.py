@@ -1,20 +1,23 @@
 from fastapi import APIRouter, Depends, status
+
 from schemas.schema_source import CreateSource, UpdateSource, ResponseSource
 from schemas.schema_source import ResponseListSource
-from schemas.schema_contact import ResponseListContact
+from schemas.schema_contact import ResponseListContact, FilterContact
 
 from models import Source
 
 from services.service_source import SourceService
+from services.service_contact import DistributeService
 
-from dependencies import get_service_source
+from dependencies.dependencies import get_service_source
+from dependencies.dependencies import get_service_distribute
+from dependencies.dependencies import get_filter_params_contact
 
 router = APIRouter(
     prefix="/sources",
     tags=["sources"],
 )
 
-# Создать ИСТОЧНИК
 @router.get("/", response_model=ResponseListSource)
 async def list_sources(
     service: SourceService = Depends(get_service_source)
@@ -24,19 +27,24 @@ async def list_sources(
 @router.post(
     "/", 
     response_model=ResponseSource)
-async def create_operator(
+async def create_source(
     source: CreateSource,
     service: SourceService = Depends(get_service_source)
 ) -> Source:
-    return service.repo.create(source)
+    return service.repo.create(
+        source.model_dump(exclude_unset=True, exclude_none=True)
+    )
 
 @router.put("/{id}", response_model=ResponseSource)
-async def update_operator(
+async def update_source(
     id: int,
     source: UpdateSource,
     service: SourceService = Depends(get_service_source)
 ) -> Source:
-    return service.repo.update(id, source)
+    return service.repo.update(
+        id, 
+        source.model_dump(exclude_unset=True, exclude_none=True)
+    )
 
 @router.delete(
     "/{id}",
@@ -55,7 +63,7 @@ async def update_operator(
         status.HTTP_204_NO_CONTENT: {"description": "Source successfully deleted"},
     }
 )
-async def delete_operator(
+async def delete_source(
     id: int,
     service: SourceService = Depends(get_service_source)
 ) -> None:
@@ -65,6 +73,8 @@ async def delete_operator(
 @router.get("/{id}/contacts", response_model=ResponseListContact)
 async def get_contacts_by_source(
     id: int,
-    service: SourceService = Depends(get_service_source)    
+    service: DistributeService = Depends(get_service_distribute),
+    filter_params: FilterContact = Depends(get_filter_params_contact),    
 ):
-    return service.get_contacts(id)
+    extended_filter_params = filter_params.model_copy(update={"source_id": id})
+    return service.repo.get_list(filter_params=extended_filter_params)

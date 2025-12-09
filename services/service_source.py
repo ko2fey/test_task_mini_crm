@@ -1,14 +1,7 @@
-import schemas
 from repositories.repo_source import SourceRepository
+from services.service_base import BaseService
+from models import Source
 
-class SourceService:
-    def __init__(self, repo):
-        self.repo: SourceRepository = repo
-
-    def get_contacts(self, id: int):
-        contacts = self.repo.get_list_contacts(id)
-        response = {
-            'objects': contacts,
-            'total_count': len(contacts)
-        }
-        return response
+class SourceService(BaseService[SourceRepository, Source]):
+    def __init__(self, repository: SourceRepository) -> None:
+        super().__init__(repo=repository)
