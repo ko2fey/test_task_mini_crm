@@ -106,10 +106,6 @@ class Operator(Base):
     
     @validates("max_loading")
     def validate_max_loading(self, key, max_loading):
-        print("Hello stas")
-        print(max_loading)
-        print(self.current_loading)
-        print(type(self.current_loading))
         if max_loading <= 0:
             raise ValueError("max_loading must be greater than 0")
         
