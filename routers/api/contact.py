@@ -43,7 +43,7 @@ async def update_contacts(
     contact: UpdateContact,
     service: DistributeService = Depends(get_service_distribute)
 ) -> Contact:
-    return service.repo.update(
+    return service.update(
         id, 
         contact.model_dump(exclude_unset=True, exclude_none=True)
     )
@@ -70,4 +70,4 @@ async def delete_operator(
     service: DistributeService = Depends(get_service_distribute)
 ) -> None:
         source = service.repo.get(id)
-        service.repo.delete(source)
+        service.delete(source)
