@@ -1,30 +1,35 @@
-from schemas.schema_priority import CreatePriority
-from repositories.repo_priorities import PriorityRepository
-from repositories.repo_operator import OperatorRepository
-from repositories.repo_source import SourceRepository
-from models import OperatorSourcePriority
+from typing import Dict, Any
+
 from exceptions.exc_base import RepositoryException
 from exceptions.exc_service import UnexpectedException
 
-class PriorityService:
+from repositories.repo_priorities import PriorityRepository
+from repositories.repo_operator import OperatorRepository
+from repositories.repo_source import SourceRepository
+
+from models import OperatorSourcePriority
+
+from services.service_base import BaseService
+
+class PriorityService(BaseService[PriorityRepository, OperatorSourcePriority]):
     def __init__(
         self, 
         repo_priority: PriorityRepository, 
         repo_operator: OperatorRepository,
         repo_source: SourceRepository
     ) -> None:
-        self.repo_priority = repo_priority
+        super().__init__(repo=repo_priority)
         self.repo_operator = repo_operator
         self.repo_source = repo_source
     
     def assign_priority(
         self, 
-        data: CreatePriority
+        data: Dict[str, Any]
     ) -> OperatorSourcePriority:
         try:
-            operator = self.repo_operator.get(data.operator_id)
-            source = self.repo_source.get(data.source_id)
-            new_priority = self.repo_priority.create(data)
+            self.repo_operator.get(data["operator_id"])
+            self.repo_source.get(data["source_id"])
+            new_priority = self.repo.create(data)
             return new_priority
         
         except RepositoryException as e:

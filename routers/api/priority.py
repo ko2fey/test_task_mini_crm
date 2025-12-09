@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, status
-from schemas.schema_priority import CreatePriority, ResponsePriority, ResponseListPriority, UpdatePriority
+from schemas.schema_priority import CreatePriority, ResponsePriority
+from schemas.schema_priority import ResponseListPriority, UpdatePriority
 
-from models import Operator, OperatorSourcePriority
+from models import OperatorSourcePriority
 
 from services.service_priority import PriorityService
 
-from dependencies import get_service_priority
+from dependencies.dependencies import get_service_priority
 
 router = APIRouter(
     prefix="/priorities",
@@ -16,7 +17,7 @@ router = APIRouter(
 async def list_priorities(
     service: PriorityService = Depends(get_service_priority)
 ):
-    return service.repo_priority.get_list()
+    return service.repo.get_list()
 
 
 @router.post(
@@ -28,7 +29,9 @@ async def create_priority(
     data: CreatePriority,
     service: PriorityService = Depends(get_service_priority)
 ) -> OperatorSourcePriority:
-    new_priority = service.assign_priority(data)
+    new_priority = service.assign_priority(
+        data.model_dump(exclude_unset=True, exclude_none=True)
+    )
     return new_priority
 
 @router.put("/{id}", response_model=ResponsePriority)
@@ -37,4 +40,7 @@ async def update_priority(
     priority: UpdatePriority,
     service: PriorityService = Depends(get_service_priority)
 ) -> OperatorSourcePriority:
-    return service.repo_priority.update(id, priority)
+    return service.repo.update(
+        id, 
+        priority.model_dump(exclude_unset=True, exclude_none=True)
+    )
