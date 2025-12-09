@@ -1,15 +1,13 @@
-from schemas.schema_operator import ResponseOperator
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
-from models import Operator, OperatorSourcePriority
+from models import Operator
 from repositories.repo_operator import OperatorRepository
-from typing import List, Optional
+
+from services.service_base import BaseService
 
 
-class OperatorService:
+class OperatorService(BaseService[OperatorRepository, Operator]):
     def __init__(self, repository: OperatorRepository) -> None:
-        self.repo = repository
-    
+        super().__init__(repository)
+   
     def get_priorities(self, id: int):
         priorities = self.repo.get_list_priotiries(id)
         response = {
@@ -18,22 +16,13 @@ class OperatorService:
         }
         return response
     
-    def get_contacts(self, id: int):
-        contacts = self.repo.get_list_contacts(id)
-        response = {
-            'objects': contacts,
-            'total_count': len(contacts)
-        }
-        return response
+    def atomic_increase_loading(self, id: int) -> Operator:       
+        return self.repo.execute_with_locked(id, self._increase)
     
-    def increase_loading(self, id: int) -> ResponseOperator:       
-        updated_operator = self.repo.execute_with_locked(id, self._increase)
-        return ResponseOperator.model_validate(updated_operator)
+    def atomic_decrease_loading(self, id: int) -> Operator:       
+        return self.repo.execute_with_locked(id, self._decrease)
     
-    def decrease_loading(self, id: int) -> Operator:       
-        operator = self.repo.execute_with_locked(id, self._decrease)
-        return operator
-        
+    # Private static methods for use inside in execute_with_locked 
     @staticmethod
     def _decrease(operator: Operator) -> Operator:
             if not operator.is_active:

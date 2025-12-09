@@ -1,6 +1,11 @@
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+    
+from sqlalchemy.orm import contains_eager
 from models import Operator, OperatorSourcePriority
-from sqlalchemy.orm import Session, contains_eager
-from .repo_base import BaseRepository
+from repositories.repo_base import BaseRepository
 from exceptions.exc_base import ForbiddenDeleteException, RepositoryException
 
 class OperatorRepository(BaseRepository[Operator]):
@@ -27,7 +32,7 @@ class OperatorRepository(BaseRepository[Operator]):
             
         except RepositoryException as e:
             raise
-   
+ 
     def get_available_operator_for_source(self, source_id: int) -> list[Operator]:
         return self.db.query(self.model) \
             .join(OperatorSourcePriority, self.model.priorities) \

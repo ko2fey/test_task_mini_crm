@@ -24,9 +24,11 @@ class ResponseOperator(BaseOperator):
     
 class ResponseListOperator(BaseModel):
     objects: List[ResponseOperator]
+    total_count: int
     page: Optional[int] = None
     limit: Optional[int] = None
-    total_count: int
+    order_by: Optional[str] = None
+    order_type: Optional[str] = None
 
 class FilterOperator(BaseModel):
     active: Optional[bool] = None
