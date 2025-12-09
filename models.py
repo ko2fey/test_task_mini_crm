@@ -127,7 +127,7 @@ class Operator(Base):
         return current_loading
     
     __table_args__ = (
-        Index("ix_operator_active", "active")
+        Index("ix_operator_active", "active"),
     )
     
     def __repr__(self):
