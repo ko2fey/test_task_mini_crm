@@ -1,8 +1,7 @@
 from pydantic import BaseModel, ConfigDict
-from enum import Enum
 from datetime import datetime
 from typing import Optional, List
-from custom_enum import StatusList
+from dependencies.custom_enum import StatusList
 
 
 class BaseContact(BaseModel):
@@ -27,6 +26,18 @@ class ResponseContact(BaseContact):
 class ResponseListContact(BaseModel):
     objects: List[ResponseContact]
     total_count: int
+    page: Optional[int] = None
+    limit: Optional[int] = None
     order_by: Optional[str] = None
     order_type: Optional[str] = None
+
+class FilterContact(BaseModel):
+    source_id: Optional[int] = None
+    operator_id: Optional[int] = None
+    lead_id: Optional[int] = None
+    status: Optional[StatusList] = None
+    created_at_ge: Optional[datetime] = None
+    created_at_le: Optional[datetime] = None
+    updated_at_ge: Optional[datetime] = None
+    updated_at_le: Optional[datetime] = None
 

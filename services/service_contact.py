@@ -1,55 +1,55 @@
-from schemas.schema_lead import AssignLead, CreateLead
-from schemas.schema_contact import CreateContact
-from repositories.repo_source  import SourceRepository
+from typing import Dict, Any, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from models import Operator
+
+from repositories.repo_source import SourceRepository
 from repositories.repo_operator import OperatorRepository
 from repositories.repo_contact import DistributeRepository
 from repositories.repo_lead import LeadRepository
 
-from models import Contact, Operator
-from custom_enum import StatusList
+from models import Contact
+
+from services.service_base import BaseService
+
+from dependencies.custom_enum import StatusList
 from exceptions.exc_service import UnexpectedException
-from typing import List, Dict, Any, Optional
+    
 
 
-class DistributeService:
+class DistributeService(BaseService[DistributeRepository, Contact]):
     def __init__(
         self, 
         source_repository: SourceRepository,
         operator_repository: OperatorRepository,
         lead_repository: LeadRepository,
         distribute_repository: DistributeRepository
-        ):
+    ):
+        super().__init__(repo=distribute_repository)
         self.repo_source = source_repository
         self.repo_operator = operator_repository
-        self.repo_lead = lead_repository
-        self.repo_distribute = distribute_repository
+        self.repo_lead = lead_repository 
     
-    def distribute_lead(self, data: AssignLead) -> Contact:
+    def distribute_lead(self, data: Dict[str, Any]) -> Contact:
         try:
             # Find or create lead
-            lead = self.repo_lead.find_by_external_id(data.external_id)
+
+            lead = self.repo_lead.find_by_external_id(data['external_id'])
             
             if lead is None:
-                lead = self.repo_lead.create(
-                    CreateLead(
-                        **data.model_dump(
-                            exclude_none=True, 
-                            exclude_unset=True, 
-                            exclude={"source_id"}
-                        )
-                    )
-                )
+                copy_data = data.copy()
+                del copy_data['source_id']
+                lead = self.repo_lead.create(copy_data)
             
             # Get source and add to lead. For model LeadsSources
             # SQLALchemy auto prevent add duplicate for relationship fields
-            source = self.repo_source.get(data.source_id)
+            source = self.repo_source.get(data['source_id'])
             lead.sources.append(source)
-            # Select best availeble operator
-            operator = self.select_best_operator(data.source_id)
+            operator = self.select_best_operator(data['source_id'])
             
             contact_data: Dict[str, Any] = {
                 "lead_id": lead.id,
-                "source_id": data.source_id
+                "source_id": data['source_id']
             }
             
             if operator:
@@ -61,7 +61,7 @@ class DistributeService:
                 )
 
             # Create contact with operator or not  
-            new_contact = self.repo_distribute.create(CreateContact(**contact_data))
+            new_contact = self.repo.create(object=contact_data)
             if new_contact and operator:
                 operator.increment_current_loading()
                 self.repo_operator.save()
@@ -69,7 +69,7 @@ class DistributeService:
             return new_contact
         
         except Exception as e:
-            self.repo_distribute.db.rollback()
+            self.repo.db.rollback()
             raise UnexpectedException(
                 status_code=500,
                 detail=f"Unexpected Error in Service Contact: {e}"
