@@ -72,7 +72,7 @@ CRUD
 3) PUT     /operators/<id> - Извенение 
 4) DELETE  /operators/<id> - Удаление
 5) GET     /operators/<id>/priorities - Список назначеных источников и заданых им приоритетов, для выбранного оператора
-6) GET     /operators/<id>/contacts - Список контактов назначенных выбранному оператору с возможность фильтрации по полям status, created_from, created_to, updated_from, updated_to
+6) GET     /operators/<id>/contacts - Список контактов назначенных выбранному оператору с возможность фильтрации по полям status, created_from, created_to, updated_from, updated_to  
            /operators/1/contacts?status=new&created_from=2025-09-06 - Пример запроса с фильтарцией => Список контактов со статусом new, которые были назначены для оператора с id=1 и созданы от 06.09.25
 
 Похожий принцип применяется и к другим Endpoints
